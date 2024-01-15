@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+import sys
+import time
+from subprocess import PIPE, Popen, check_call, CalledProcessError
 
-from __future__ import print_function
-import os, subprocess, XenAPI, inventory, time, sys
+import inventory
+import XenAPI
 
 # Script which monitors the domains running on a host, looks for
 # paused domains which don't correspond to VMs which are running here
@@ -10,7 +13,11 @@ import os, subprocess, XenAPI, inventory, time, sys
 # Return a list of (domid, uuid) tuples, one per paused domain on this host
 def list_paused_domains():
     results = []
-    all = subprocess.Popen(["@OPTDIR@/bin/list_domains"], stdout=subprocess.PIPE).communicate()[0]
+    all = Popen(
+        ["@OPTDIR@/bin/list_domains"],
+        stdout=PIPE,
+        universal_newlines=True
+    ).communicate()[0]
     lines = all.split("\n")
     for domain in lines[1:]:
         bits = domain.split()
@@ -27,7 +34,7 @@ def list_paused_domains():
 def should_domain_be_somewhere_else(localhost_uuid, domain):
     (domid, uuid) = domain
     try:
-        x = XenAPI.xapi_local()
+        x = XenAPI.xapi_local()  # pytype: disable=name-error
         x.xenapi.login_with_password("root", "", "1.0", "xen-api-scripts-monitor-unwanted-domains.py")
         try:
             try:
@@ -36,12 +43,12 @@ def should_domain_be_somewhere_else(localhost_uuid, domain):
                 current_operations = x.xenapi.VM.get_current_operations(vm)
                 result = current_operations == {} and resident_on != localhost_uuid
                 if result:
-                    log("domid %s uuid %s: is not being operated on and is not resident here" % (domid, uuid))
+                    print("domid %s uuid %s: is not being operated on and is not resident here" % (domid, uuid))
                     return result
-            except XenAPI.Failure as e:
+            except XenAPI.Failure as e:  # pytype: disable=name-error
                 if e.details[0] == "UUID_INVALID":
                     # VM is totally bogus
-                    log("domid %s uuid %s: is not in the xapi database" % (domid, uuid))
+                    print("domid %s uuid %s: is not in the xapi database" % (domid, uuid))
                     return True
                 # fail safe for now
                 return False
@@ -50,14 +57,17 @@ def should_domain_be_somewhere_else(localhost_uuid, domain):
     except:
         return False
 
-def log(str):
-    print(str)
-
 # Destroy the given domain
 def destroy_domain(domain):
     (domid, uuid) = domain
-    log("destroying domid %s uuid %s" % (domid, uuid))
-    all = subprocess.Popen(["@OPTDIR@/debug/destroy_domain", "-domid", domid], stdout=subprocess.PIPE).communicate()[0]
+    print("destroying domid %s uuid %s" % (domid, uuid))
+    try:
+        # this module triggers a bug in pytype:
+        check_call(  # pytype: disable=name-error 
+            ["@OPTDIR@/debug/destroy_domain", "-domid", domid],
+        )
+    except CalledProcessError:  # pytype: disable=name-error 
+        pass
 
 # Keep track of when a domain first looked like it should be here
 domain_first_noticed = {}
@@ -71,9 +81,10 @@ if __name__ == "__main__":
         time.sleep(1)
         paused = list_paused_domains ()
         # GC the domain_first_noticed map
-        for d in domain_first_noticed.keys():
+        for d in domain_first_noticed:
             if d not in paused:
-                log("domid %s uuid %s: looks ok now, forgetting about it" % d)
+                # Fixme: use localhost_uuid:
+                print("domid %s: looks ok now, forgetting about it" % d)
                 del domain_first_noticed[d]
 
         for d in list_paused_domains():
@@ -82,7 +93,8 @@ if __name__ == "__main__":
                     domain_first_noticed[d] = time.time()
                 noticed_for = time.time() - domain_first_noticed[d]
                 if noticed_for > threshold:
-                    log("domid %s uuid %s: has been in bad state for over threshold" % d)
+                    # Fixme: use localhost_uuid:
+                    print("domid %s: has been in bad state for over threshold" % d)
                     if "-destroy" in sys.argv:
                         destroy_domain(d)
 
