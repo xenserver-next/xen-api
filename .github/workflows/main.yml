@@ -194,3 +194,14 @@ jobs:
           github_token: ${{ secrets.github_token }}
           reporter: github-pr-review
           level: error
+
+      - uses: tsuyoshicho/action-mypy@v3
+        with:
+          # Change reviewdog reporter if you need [github-pr-check,github-check,github-pr-review].
+          reporter: github-pr-review
+          # Change reporter level if you need.
+          # GitHub Status Check won't become failure with warning.
+          level: warning
+          # Change the current directory to run mypy command.
+          # mypy command reads setup.cfg or other settings file in this path.
+          workdir: .
