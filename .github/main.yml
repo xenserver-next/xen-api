@@ -14,16 +14,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        docker-image:  # See https://hub.docker.com/_/python/tags for images
-          - python:2.7.18-alpine3.11
-          - python:3.11.4-alpine3.18
-    container: ${{ matrix.docker-image }}
+        python-version: ['2.7', '3.11']
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Setup Python ${{matrix.python-version}} (without a container)
+        uses: LizardByte/setup-python-action@master
+        with:
+          python-version: ${{matrix.python-version}}
+
       - name: Install python 2 dependencies
-        if: ${{ startsWith(matrix.docker-image, 'python:2.7.18') }}
+        if: ${{ matrix.python-version == '2.7' }}
         run: pip install enum
 
       - name: Install dependencies
@@ -115,3 +117,45 @@ jobs:
 
       - name: quality-gate
         run: make quality-gate
+
+      # uses: tsuyoshicho/action-mypy@v3.13.0
+      - uses: bernhardkaindl/action-mypy@36cb3a857d01c1bdaa2811893106c71580132d71
+        with:
+          filter_mode: no_filter
+          setup_method: install
+          setup_command: pip install mypy mock
+          mypy_flags: |
+            --scripts-are-modules
+            --check-untyped-defs
+            --allow-redefinition
+            --hide-error-context
+            --ignore-missing-imports
+            --no-pretty
+            --warn-unreachable
+            --exclude ocaml/
+            --exclude scripts/examples
+            --exclude scripts/examples/python/monitor-unwanted-domains.py
+            --exclude scripts/scalability-tests/ping-master.py
+            --exclude scripts/backup-sr-metadata.py
+            --exclude scripts/restore-sr-metadata.py
+            --exclude scripts/nbd_client_manager.py
+            --config-file mypy.ini
+          target: |
+            scripts/perfmon
+            scripts/hfx_filename
+            scripts/mail-alarm
+            scripts/host-display
+          github_token: ${{ secrets.github_token }}
+          reporter: github-pr-review
+
+      - uses: dciborow/action-pylint@0.1.1
+        with:
+          filter_mode: no_filter
+          glob_pattern: "scripts/*"
+          pylint_args: |
+            --verbose
+            --disable=trailing-whitespace
+            --disable=bad-indentation
+            --rc .pylintrc
+          github_token: ${{ secrets.github_token }}
+          reporter: github-pr-review
