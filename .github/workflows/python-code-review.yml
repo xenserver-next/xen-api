@@ -1,0 +1,82 @@
+name: Python Code Review
+on: [pull_request]
+
+# Cancel a currently running workflow from the same PR, branch or tag when
+# a new workflow is triggered:
+# https://stackoverflow.com/questions/66335225/how-to-cancel-previous-runs-in-the-pr-when-you-push-new-commitsupdate-the-curre
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+
+jobs:
+  python-code-review:
+    name: Python Code Review
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Needed to get the changed lines: origin/master..HEAD
+
+      - name: Setup Python 3.11
+        uses: LizardByte/setup-python-action@master
+        with:
+          python-version: 3.11
+
+      # uses: tsuyoshicho/action-mypy@v3.13.0
+      - uses: bernhardkaindl/action-mypy@36cb3a857d01c1bdaa2811893106c71580132d71
+        env:
+          MYPYPATH = scripts/examples/python:scripts/examples:scripts/plugins:scripts:.
+        with:
+          filter_mode: nofilter
+          setup_method: install
+          setup_command: pip install mypy mock
+          mypy_flags: |
+            --scripts-are-modules
+            --check-untyped-defs
+            --allow-redefinition
+            --ignore-missing-imports
+            --no-pretty
+            --warn-unreachable
+            --disable-error-code attr-defined
+            --disable-error-code call-overload
+            --disable-error-code import-not-found
+            --disable-error-code import-untyped
+            --disable-error-code type-arg
+            --disable-error-code var-annotated
+            --exclude ocaml/
+            --exclude scripts/examples
+            --exclude scripts/examples/python/monitor-unwanted-domains.py
+            --exclude scripts/scalability-tests/ping-master.py
+            --exclude scripts/backup-sr-metadata.py
+            --exclude scripts/restore-sr-metadata.py
+            --exclude scripts/nbd_client_manager.py
+          target: |
+            scripts/perfmon
+            scripts/hfx_filename
+          github_token: ${{ secrets.github_token }}
+          reporter: github-pr-review
+
+      - uses: dciborow/action-pylint@0.1.1
+        with:
+          filter_mode: nofilter
+          glob_pattern: scripts/**/*.py
+          pylint_flags: |
+            --disable bad-indentation
+            --disable consider-using-dict-comprehension
+            --disable consider-using-f-string
+            --disable consider-using-with
+            --disable import-error
+            --disable import-outside-toplevel
+            --disable invalid-name
+            --disable missing-final-newline
+            --disable missing-function-docstring
+            --disable multiple-imports
+            --disable redefined-outer-name
+            --disable trailing-whitespace
+            scripts/perfmon
+            scripts/hfx_filename
+            scripts/test_perfmon.py
+            scripts/test_hfx_filename.py
+          github_token: ${{ secrets.github_token }}
+          reporter: github-pr-review
