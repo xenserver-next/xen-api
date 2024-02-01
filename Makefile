@@ -119,6 +119,10 @@ sdksanity: sdk
 python:
 	$(MAKE) -C scripts/examples/python build
 
+# Python test targets for GitHub CI/CD and local development:
+pytest pytest-annotate pytest-diff-cover:
+	$(MAKE) -f scripts/unit_test/Makefile $@
+
 doc-json:
 	dune exec --profile=$(PROFILE) -- ocaml/idl/json_backend/gen_json.exe -destdir $(XAPIDOC)/jekyll
 

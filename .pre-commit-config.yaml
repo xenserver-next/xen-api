@@ -1,5 +1,8 @@
-#
-# Configuration of pre-commit, a Python framework for git hooks.
+# -------------------------------------------------------------------------
+# `pre-commit` is a framework for managing and maintaining multi-language
+# pre-commit hooks. The hooks are run on every commit, and can be run
+# manually with `pre-commit run`. See: https://pre-commit.com/
+# -------------------------------------------------------------------------
 # pre-commit is run for each git push by GitHub CI. It can run
 # locally as well for early feedback and automatic formatting
 # like trailing whitespace removal (to be configured later):
@@ -21,13 +24,59 @@ repos:
     rev: v4.5.0
     hooks:
     -   id: no-commit-to-branch
-        name: "The master branch should be pulled only, don't commit to it"
+        name: "The master branch should be pulled only"
         args: [--branch, master]
         always_run: true
     -   id: check-merge-conflict
     -   id: check-yaml
     -   id: check-executables-have-shebangs
         exclude: ocaml
+
+-   repo: local
+    hooks:
+    # Used by GitHub CI to test py2/py3 in different row of the test matrix:
+    # eg: SKIP=py3 pre-commit run # This skips pytest3 and diff-cover3
+    -   alias: py3
+        id: pytest3
+        name: check Python 3 unit tests to pass
+        language_version: python3
+        entry: env PIP_INSTALL=done scripts/unit_test/test_runner.py
+        pass_filenames: false
+        language: python
+        types: [python]
+        additional_dependencies:
+        - coverage
+        - diff-cover
+        - future
+        - mock
+        - pytest<7
+        - pytest-coverage
+        - pytest-mock
+        - pytest-pythonpath
+        - pytest-timeout
+        - pyyaml
+
+-   repo: local
+    hooks:
+    -   id: pytest2
+        language_version: python2.7
+        name: check Python 2 unit tests to pass
+        entry: env PIP_INSTALL=done scripts/unit_test/test_runner.py
+        pass_filenames: false
+        language: python
+        types: [python]
+        additional_dependencies:
+        - coverage
+        - diff-cover
+        - enum # Required for Python 2.7 (is not in the standard library)
+        - future # Use the alias for the new standard library in Python 2/3
+        - mock # Required for Python 2.7 (does not have unittest.mock)
+        - pytest<7
+        - pytest-coverage
+        - pytest-mock
+        - pytest-pythonpath
+        - pytest-timeout
+        - pyyaml
 
 # Recommendation for a minimal git pre-push hook:
 # While using pre-commit yields great results, it

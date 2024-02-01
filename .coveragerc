@@ -1,0 +1,12 @@
+[run]
+# This tells python coverage to not only collect coverage for scripts and ocaml
+# but not the modules in the virtualenv, which reduces the noise in Python2.7
+# coverage which would otherwise report coverage for the virtualenv packages
+# as well and dramatically speeds up pytest with coverage to normal speed:
+source =
+    scripts
+    ocaml
+omit=
+    scripts/unit_test/test_runner.py
+    */site-packages/*
+    */.eggs/*
