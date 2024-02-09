@@ -207,7 +207,7 @@ def report_on(config: Config, log: TextIO, command: List[str], results: Info) ->
 def readline(fileobj: Any) -> str:
     """Convince pytype that fileobj is of type FileDescriptorLike"""
 
-    ret = fileobj.readline()  # type: str
+    ret: str = fileobj.readline()
     return ret
 
 
@@ -569,8 +569,8 @@ def check_only_reverts_from_branch_point(config: Config, changed_files: List[str
     pr_number = env.get("PR_NUMBER", "")
     msgs = github_get_pr_commit_messages(repo, pr_number)
     if not msgs:
-        old_cmd = ["git", "log", "--pretty=%s", find_branch_point(config) + "..HEAD"]
-        msgs = check_output(old_cmd, universal_newlines=True).split("\n")  # nosec:B607 B603
+        cmd = ["git", "log", "--pretty=%s", find_branch_point(config) + "..HEAD"]
+        msgs = check_output(cmd, universal_newlines=True).split("\n")  # nosec:B607 B603
 
     for commit_message in msgs:  # Check if each commit is a revert
         print("#> " + commit_message)
@@ -580,8 +580,8 @@ def check_only_reverts_from_branch_point(config: Config, changed_files: List[str
     # diff the xfail files in the PR with their state 4 weeks ago and show the check
     # on stdout and the GitHub PR comment added by saving a file in this script:
     pr_url = f"{config['repo_url']}/pull/{pr_number or '<PR-number>'}"
-    old_cmd = ["git", "rev-list", "-n1", "--before=4 weeks ago", "HEAD" ]
-    old_ref = check_output(old_cmd, universal_newlines=True).strip()
+    cmd = ["git", "rev-list", "-n1", "--before=4 weeks ago", "HEAD"]
+    old_ref = check_output(cmd, universal_newlines=True).strip()
     config["msg"] = f'\n## {config["script_name"]}: Only "Revert" commits on this PR.\n'
     config["msg"] += "Checking the revert diff:\n```sh\ngh pr checkout " + pr_url + "\n"
     config["msg"] += "REF=$(git rev-list -n 1 --before='4 weeks ago' HEAD)\n"

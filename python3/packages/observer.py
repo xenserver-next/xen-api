@@ -40,6 +40,7 @@ from typing import List, Sequence
 # pylint: disable=no-value-for-parameter
 # We only want to import opentelemetry libraries if instrumentation is enabled
 # pylint: disable=import-outside-toplevel
+# pyright: reportArgumentType=false, reportCallIssue=false
 
 DEBUG_ENABLED = False
 DEFAULT_MODULES = "LVHDSR,XenAPI,SR,SRCommand,util"
