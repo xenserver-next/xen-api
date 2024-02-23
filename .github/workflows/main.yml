@@ -108,6 +108,7 @@ jobs:
   ocaml-test:
     name: Ocaml tests
     runs-on: ubuntu-20.04
+    if: ${{ vars.OCAML_TESTS != 'skip' }}
     env:
       XAPI_VERSION: "v0.0.0"
 
@@ -194,6 +195,7 @@ jobs:
   deprecation-test:
     name: Deprecation tests
     runs-on: ubuntu-20.04
+    if: ${{ vars.DEPRECATION_TESTS != 'skip' }}
 
     steps:
       - name: Checkout code
