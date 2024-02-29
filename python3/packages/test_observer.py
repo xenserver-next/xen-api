@@ -25,11 +25,27 @@ TEST_CONFIG = """
     OTEL_SERVICE_NAME='test-observer'
     OTEL_RESOURCE_ATTRIBUTES='service.name=sm'
     """
+TEST_OBSERVER_CONF = "test-observer.conf"
+OBSERVER_OPEN = "packages.observer.open"
 
 
 # pylint: disable=missing-function-docstring,protected-access
 class TestObserver(unittest.TestCase):
     """Test python3/packages/observer.py"""
+
+    def simple_method(self):
+        """A simple helper method to for tests to wrap using observer.span"""
+
+        return 5
+
+    def init_tracing_and_run_simple_method(self, read_data):
+        """Run the init_tracing method with the given read_data"""
+
+        with patch(OBSERVER_OPEN, mock_open(read_data=read_data)):
+            span, _ = observer._init_tracing([TEST_OBSERVER_CONF], ".")
+
+        simple_method = span(self.simple_method)
+        self.assertEqual(simple_method(), 5)
 
     def test_span_with_parameters(self):
         span, _ = observer._init_tracing([], ".")
@@ -42,7 +58,7 @@ class TestObserver(unittest.TestCase):
         self.assertEqual(simple_method(), 5)
 
     def test_span_of_tracers_with_parameters(self):
-        with patch("observer.open", mock_open(read_data="empty")):
+        with patch(OBSERVER_OPEN, mock_open(read_data="empty")):
             span, _ = observer._init_tracing(["test-observer.conf"], ".")
 
         # This needs to use the decorator sugar so that wrapped is initially None
@@ -51,10 +67,6 @@ class TestObserver(unittest.TestCase):
             return 5
 
         self.assertEqual(simple_method(), 5)
-
-    # A method to decorate with observer.span
-    def simple_method(self):
-        return 5
 
     # Use the span method defined on import with no configs
     def test_span_after_import(self):
@@ -91,41 +103,31 @@ class TestObserver(unittest.TestCase):
         self.assertEqual(configs, [])
 
     def test_configs_exist(self):
-        with patch("observer.open", mock_open(read_data="empty")):
-            span, _ = observer._init_tracing(["test-observer.conf"], ".")
-
-        simple_method = span(self.simple_method)
-
-        self.assertEqual(simple_method(), 5)
+        self.init_tracing_and_run_simple_method(read_data=TEST_CONFIG)
         self.assertEqual(os.environ["OTEL_RESOURCE_ATTRIBUTES"], "service.name=sm")
 
     def test_all_conf_missing(self):
-        with patch("observer.open") as mock_file:
+        with patch(OBSERVER_OPEN) as mock_file:
             mock_file.return_value.__enter__.side_effect = [
                 FileNotFoundError,
                 mock_open(read_data="empty").return_value,
             ]
-            span, _ = observer._init_tracing(["test-observer.conf"], ".")
+            span, _ = observer._init_tracing([TEST_OBSERVER_CONF], ".")
 
         simple_method = span(self.simple_method)
 
         self.assertEqual(simple_method(), 5)
 
     def test_config_values(self):
-        with patch("observer.open", mock_open(read_data=TEST_CONFIG)):
-            span, _ = observer._init_tracing(["test-observer.conf"], ".")
-
-        simple_method = span(self.simple_method)
-
-        self.assertEqual(simple_method(), 5)
+        self.init_tracing_and_run_simple_method(read_data=TEST_CONFIG)
 
     # A method to decorate with observer.span
     def simple_method_with_args(self, a, b=3):
-        return a+b
+        return a + b
 
     def test_tracing_with_arguments(self):
-        with patch("observer.open", mock_open(read_data="empty")):
-            span, _ = observer._init_tracing(["test-observer.conf"], ".")
+        with patch(OBSERVER_OPEN, mock_open(read_data="empty")):
+            span, _ = observer._init_tracing([TEST_OBSERVER_CONF], ".")
 
         simple_method_with_args = span(self.simple_method_with_args)
 
