@@ -176,30 +176,44 @@ def _init_tracing(configs: List[str], config_dir: str):  # NOSONAR(complexity=68
                 f"{trace_log_dir}/{service_name}-{host_uuid}-{trace_state}-{now}.ndjson"
             )
 
+        # With the filename_callback parameter, this class can now be moved
+        # outside of the function to the toplevel of _init_tracing module.
+        # In this commit, the class is still inside the function to make it
+        # easier to understand the changes.
+        #
         # pylint: disable=too-few-public-methods
         class FileZipkinExporter(ZipkinExporter):
             """Class to export spans to a file in Zipkin format."""
 
             def __init__(self, *args, **kwargs):
-                self.bugtool_filename = bugtool_filenamer()
+                self.bugtool_filename_callback = kwargs.pop("filename_callback")
+                self.bugtool_filename = self.bugtool_filename_callback()
                 debug("bugtool filename=%s", self.bugtool_filename)
-                self.written_so_far_in_file = 0
+                self.bytes_written = 0
                 super().__init__(*args, **kwargs)
 
-            def export(self, spans: Sequence[Span]) -> SpanExportResult:
+            def export(
+                self,
+                spans: Sequence[trace.Span],  # type: ignore[override,no-any-unimported]
+            ):
                 """Export the given spans to the file endpoint."""
+
                 data = self.encoder.serialize(spans, self.local_node)
                 datastr = str(data)
                 debug("data.type=%s,data.len=%s", type(data), len(datastr))
                 debug("data=%s", datastr)
                 os.makedirs(name=trace_log_dir, exist_ok=True)
+
                 with open(self.bugtool_filename, "a", encoding="utf-8") as bugtool_file:
                     bugtool_file.write(f"{datastr}\n")  # ndjson
-                self.written_so_far_in_file += len(data)
-                if self.written_so_far_in_file > 1024 * 1024:
-                    self.bugtool_filename = bugtool_filenamer()
-                    self.written_so_far_in_file = 0
-                return SpanExportResult.SUCCESS
+
+                # split file if it gets > 1MB
+                self.bytes_written += len(data)
+                if self.bytes_written > 1024 * 1024:
+                    self.bugtool_filename = self.bugtool_filename_callback()
+                    self.bytes_written = 0
+
+                return sdk.trace.export.SpanExportResult.SUCCESS
 
         traceparent = os.getenv("TRACEPARENT", None)
         propagator = TraceContextTextMapPropagator()
