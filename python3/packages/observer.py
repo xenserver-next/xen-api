@@ -9,11 +9,13 @@
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Lesser General Public License for more details.
-
+#
 """
-If at least one *observer.conf file exists, this script will attempt to auto-instrument the script
-given to it to make a trace of all function calls. If there are no *observer.conf files or something
-fails, this script is a noop and simply calls the script it is given with its original arguments.
+Calls the passed script with its original arguments, instrumenting it if at
+least one *observer.conf file exists in the OBSERVER_CONFIG_DIR directory.
+
+If there are no *observer.conf files or something fails, this script runs the
+passed script without any instrumentation.
 """
 
 import functools
