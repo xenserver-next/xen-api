@@ -154,25 +154,26 @@ def _init_tracing(configs: List[str], config_dir: str):  # NOSONAR(complexity=68
         opentelemetry_exporter_zipkin_endpoints = (
             zipkin_endpoints.split(",") if zipkin_endpoints else []
         )
-        otel_resource_attributes = dict(
+        opentelemetry_resource_attrs = dict(
             item.split("=")
-            for item in argkv.get("otel_resource_attributes", "").split(",")
+            for item in config.get("otel_resource_attributes", "").split(",")
             if "=" in item
         )
-        service_name = argkv.get(
-            "otel_service_name", otel_resource_attributes.get("service.name", "unknown")
-        )
-
-        host_uuid = otel_resource_attributes.get("xs.host.uuid", "unknown")
-        # Remove . to prevent users changing directories in the bugtool_filenamer
-        tracestate = os.getenv("TRACESTATE", "unknown").strip("'").replace(".", "")
 
         # rfc3339
-        def bugtool_filenamer():
-            """Compound function to return an rfc3339-compilant ndjson file name"""
+        def get_new_output_filename():
+            """Return an rfc3339-compliant ndjson file name."""
+
+            service_name = config.get(
+                "otel_service_name",
+                opentelemetry_resource_attrs.get("service.name", "unknown"),
+            )
+            host_uuid = opentelemetry_resource_attrs.get("xs.host.uuid", "unknown")
+            # Remove . to prevent users changing directories in the filename
+            trace_state = os.getenv("TRACESTATE", "unknown").strip("'").replace(".", "")
             now = datetime.now(timezone.utc).isoformat()
             return (
-                f"{trace_log_dir}/{service_name}-{host_uuid}-{tracestate}-{now}.ndjson"
+                f"{trace_log_dir}/{service_name}-{host_uuid}-{trace_state}-{now}.ndjson"
             )
 
         # pylint: disable=too-few-public-methods
