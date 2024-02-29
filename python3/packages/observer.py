@@ -235,12 +235,19 @@ def _init_tracing(configs: List[str], config_dir: str):  # NOSONAR(complexity=68
                 )
             )
         )
+        # Add a span processor for the file endpoint if trace_log_dir is
+        # defined in the config file. The file endpoint is used for debugging
+        # and is not intended for production use.
+        # The file endpoint is used for debugging and is not intended for
+        #
         if trace_log_dir:
-            processor_filezipkin = BatchSpanProcessor(FileZipkinExporter())
-            provider.add_span_processor(processor_filezipkin)
-        for zipkin_endpoint in otel_exporter_zipkin_endpoints:
-            processor_zipkin = BatchSpanProcessor(
-                # https://opentelemetry-python.readthedocs.io/en/latest/exporter/zipkin/zipkin.html
+            processor_file_zipkin = sdk.trace.export.BatchSpanProcessor(
+                FileZipkinExporter(filename_callback=get_new_output_filename)
+            )
+            provider.add_span_processor(processor_file_zipkin)
+        for zipkin_endpoint in opentelemetry_exporter_zipkin_endpoints:
+            processor_zipkin = sdk.trace.export.BatchSpanProcessor(
+                # https://opentelemetry-python.readthedocs.io/en/exporter/zipkin/zipkin.html
                 ZipkinExporter(endpoint=zipkin_endpoint)
             )
             provider.add_span_processor(processor_zipkin)
