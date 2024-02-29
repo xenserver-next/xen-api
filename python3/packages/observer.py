@@ -206,8 +206,14 @@ def _init_tracing(configs: List[str], config_dir: str):  # NOSONAR(complexity=68
         # and add a span processor for each zipkin endpoint
 
         provider = TracerProvider(
-            resource=Resource.create(
-                W3CBaggagePropagator().extract({}, otel_resource_attributes)
+            resource=sdk.resources.Resource.create(
+                cast(
+                    dict[str, Any],  # cast dict[str, object] to dict[str, Any] for mypy
+                    W3CBaggagePropagator().extract(
+                        carrier={},  # context is expected to be Context():
+                        context=context.Context(opentelemetry_resource_attrs),
+                    ),
+                )
             )
         )
         if trace_log_dir:
