@@ -316,61 +316,59 @@ def _init_tracing(configs: List[str], config_dir: str):  # NOSONAR(complexity=68
                     aspan.set_attribute("xs.span.args.str", str(args))
                     aspan.set_attribute("xs.span.kwargs.str", str(kwargs))
                 else:
-                    # function, staticmethod or instancemethod
+                    # function, staticmethod or instance method
                     bound_args = inspect.signature(wrapped).bind(*args, **kwargs)
                     bound_args.apply_defaults()
                     for k, v in bound_args.arguments.items():
                         aspan.set_attribute(f"xs.span.arg.{k}", str(v))
-                # must be inside aspan to produce nested trace
+
+                # must be inside "aspan" to produce nested trace
                 result = wrapped(*args, **kwargs)
+
             return result
 
-        # wrapt.decorator adds the extra parameters so we shouldn't provide them
-        # pylint: disable=no-value-for-parameter
         def autoinstrument_class(aclass):
-            try:
-                if inspect.isclass(aclass):
-                    tracer = tracers[0]
-                    my_module_name = f"{aclass.__module__}:{aclass.__qualname__}"
-                    with tracer.start_as_current_span(
-                        f"auto_instrumentation.add: {my_module_name}"
-                    ):
-                        for name in [
-                            fn
-                            for fn in aclass.__dict__
-                            if callable(getattr(aclass, fn))
-                        ]:
-                            f = aclass.__dict__[name]
-                            span_name = f"class.instrument:{my_module_name}.{name}={f}"
-                            with tracer.start_as_current_span(span_name):
-                                if name not in [
-                                    "__getattr__",
-                                    "__call__",
-                                    "__init__",
-                                ]:  # avoids python error 'maximum recursion depth exceeded
-                                    # in comparison' in XenAPI
-                                    try:
-                                        setattr(aclass, name, wrapper(f))
-                                    except Exception:
-                                        debug(
-                                            "setattr.Wrapper: Exception %s",
-                                            traceback.format_exc(),
-                                        )
-            except Exception:
-                debug("Wrapper: Exception %s", traceback.format_exc())
+            """Auto-instrument a class."""
 
-        def autoinstrument_module(amodule):
-            classes = inspect.getmembers(amodule, inspect.isclass)
-            for _, aclass in classes:
-                autoinstrument_class(aclass)
-            functions = inspect.getmembers(amodule, inspect.isfunction)
-            for function_name, afunction in functions:
-                setattr(amodule, function_name, wrapper(afunction))
+            t = tracers[0]
+            module_name = f"{aclass.__module__}:{aclass.__qualname__}"
+
+            with t.start_as_current_span(f"auto_instrumentation.add: {module_name}"):
+                for method_name, method in aclass.__dict__.items():
+                    if not callable(getattr(aclass, method_name)):
+                        continue
+
+                    with t.start_as_current_span(
+                        f"class.instrument:{module_name}.{method_name}={method}"
+                    ):
+                        # Avoid RecursionError:
+                        # maximum recursion depth exceeded in comparison
+                        # in the XenAPI module (triggered by XMLRPC calls in it):
+                        if method_name in ["__getattr__", "__call__", "__init__"]:
+                            continue
+                        try:
+                            setattr(aclass, method_name, instrument_function(method))
+                        except Exception:
+                            debug("setattr.Wrapper: Exception %s", exception())
+
+        def instrument_module(module):
+            """Instrument the classes and functions in a module."""
+
+            # instrument the methods of the classes in the module
+            for _, class_obj in inspect.getmembers(module, predicate=inspect.isclass):
+                try:
+                    autoinstrument_class(class_obj)
+                except Exception:
+                    debug("Wrapper: Exception %s", exception())
+
+            # instrument the module-level functions of the module
+            for function, func_object in inspect.getmembers(module, inspect.isfunction):
+                setattr(module, function, instrument_function(func_object))
 
         if inspect.ismodule(wrapped):
-            autoinstrument_module(wrapped)
+            instrument_module(wrapped)
 
-        return wrapper(wrapped)
+        return instrument_function(wrapped)
 
     def _patch_module(module_name):
         wrapt.importer.discover_post_import_hooks(module_name)
