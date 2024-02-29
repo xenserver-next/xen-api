@@ -18,19 +18,29 @@ If there are no *observer.conf files or something fails, this script runs the
 passed script without any instrumentation.
 """
 
+import configparser
 import functools
 import inspect
 import logging
 import os
 import runpy
+import shlex
 import sys
-import traceback
 from datetime import datetime, timezone
 from logging.handlers import SysLogHandler
+from traceback import format_exc as exception
+from typing import Any, List, Sequence, cast
 
-import configparser
-from typing import Sequence
+# The opentelemetry library may generate exceptions we aren't expecting:
+# But this code must not fail or it will cause the pass-through script to fail
+# when at worst this script should be a noop. As such, we sometimes need to
+# catch broad exceptions:
+# pylint: disable=broad-exception-caught, too-many-locals, too-many-statements
+# wrapt.decorator adds the extra parameters so we shouldn't provide them:
+# pylint: disable=no-value-for-parameter, import-outside-toplevel
 
+ENVVARS = "opentelemetry-python.readthedocs.io/en/latest/sdk/environment_variables.html"
+DEFAULT_MODULES = "LVHDSR,XenAPI,SR,SRCommand,util"
 DEBUG_ENABLED = False
 FORMAT = "observer.py: %(message)s"
 handler = SysLogHandler(facility="local5", address="/dev/log")
