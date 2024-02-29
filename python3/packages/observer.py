@@ -404,9 +404,10 @@ except Exception as exc:
 
 def main():
     """
-    Run a program passed as parameter, with its original arguments so that there's no need to
-    manually decorate the program. The program will be forcibly instrumented by patch_module
-    above when the corresponding module in program is imported.
+    Run the passed python script using the runpy module, passing the given arguments.
+
+    The program will be automatically instrumented when the corresponding module
+    in the program is imported.
     """
 
     # Shift all the argvs one left
