@@ -132,22 +132,26 @@ def _init_tracing(configs: List[str], config_dir: str):  # NOSONAR(complexity=68
     try:
         config_dict = read_config(f"{config_dir}/all.conf", header="default")
     except FileNotFoundError:
-        kvs_all_conf = {}
-    module_names = kvs_all_conf.get(
-        "module_names", "LVHDSR,XenAPI,SR,SRCommand,util"
-    ).split(",")
-    debug("module_names=%s", module_names)
+        config_dict = {}
 
-    def tracer_of_config(path):
-        otelvars = "opentelemetry-python.readthedocs.io/en/latest/sdk/environment_variables.html"
-        argkv = kvs_of_config(path, header=otelvars)
-        config_otel_resource_attributes = argkv.get("otel_resource_attributes", "")
-        if config_otel_resource_attributes:
-            # OTEL requires some attributes e.g. service.name to be in the environment variable
-            os.environ["OTEL_RESOURCE_ATTRIBUTES"] = config_otel_resource_attributes
-        trace_log_dir = argkv.get("xs_exporter_bugtool_endpoint", "")
-        zipkin_endpoints = argkv.get("xs_exporter_zipkin_endpoints")
-        otel_exporter_zipkin_endpoints = (
+    module_names = config_dict.get("module_names", DEFAULT_MODULES).split(",")
+    debug("module_names:%s", module_names)
+
+    def create_tracer_from_config(path):
+        """Create a tracer from a config file."""
+
+        config = read_config(path, header=ENVVARS)
+        cfg_opentelemetry_resource_attrs = config.get("otel_resource_attributes", "")
+
+        if cfg_opentelemetry_resource_attrs:
+            # opentelemetry requires some attributes,
+            # e.g. service.name to be in the environment variable
+            os.environ["OTEL_RESOURCE_ATTRIBUTES"] = cfg_opentelemetry_resource_attrs
+
+        trace_log_dir = config.get("xs_exporter_bugtool_endpoint", "")
+
+        zipkin_endpoints = config.get("xs_exporter_zipkin_endpoints")
+        opentelemetry_exporter_zipkin_endpoints = (
             zipkin_endpoints.split(",") if zipkin_endpoints else []
         )
         otel_resource_attributes = dict(
