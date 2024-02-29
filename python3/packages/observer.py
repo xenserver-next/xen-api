@@ -410,7 +410,14 @@ def main():
     in the program is imported.
     """
 
-    # Shift all the argvs one left
+    # When sys.argv has only argv[0], but no command to call, exit with an error message
+
+    if len(sys.argv) < 2:
+        print(__file__ + ": usage: command argument list", file=sys.stderr)
+        return 31  # EINVAL
+
+    # Shift the arguments by one so that program to run first in sys.argv
+
     sys.argv = sys.argv[1:]
     argv0 = sys.argv[0]
 
