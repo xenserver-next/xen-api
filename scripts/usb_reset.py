@@ -47,12 +47,13 @@ import ctypes.util
 import errno
 import fcntl
 import grp
-import xcp.logger as log
 import logging
 import os
 import pwd
 import re
 from stat import S_ISCHR, S_ISBLK
+
+import xcp.logger as log  # type: ignore[import-not-found]
 
 
 def parse_arg():

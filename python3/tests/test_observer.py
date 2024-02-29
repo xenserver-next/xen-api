@@ -1,3 +1,5 @@
+"""Test python3/packages/observer.py"""
+
 import os
 import sys
 import unittest
@@ -6,8 +8,8 @@ from mock import MagicMock, mock_open, patch
 
 # Ensure observer is initialised as noop
 with patch("os.listdir") as mock_listdir:
-    mock_listdir.return_value = []
-    import observer
+    mock_listdir.return_value = []  # prevent it finding an observer.conf
+    from packages import observer
 
 # mock modules to avoid dependencies
 sys.modules["opentelemetry"] = MagicMock()
