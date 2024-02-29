@@ -388,9 +388,18 @@ debug("configs = %s", observer_configs)
 
 try:
     # If there are configs, span and patch_module are now operational
+    # and can be used to trace the program.
+    # If there are no configs, or an exception is raised, span and patch_module
+    # are not overridden and will be the defined no-op functions.
+
+    # TODO: Please describe the purpose of patch_module and where it is called:
+    # I could not find the mechanism that calls patch_module!
+    # Is it called by wrapt.importer.when_imported() or so?
+    # If not, it should be removed from the return value of _init_tracing,
+    # and the no-op patch_module function should be removed as well:
     span, patch_module = _init_tracing(observer_configs, observer_config_dir)
 except Exception as exc:
-    syslog.error("Exception while setting up tracing, running script as noop: %s", exc)
+    syslog.error("Exception while setting up tracing, running script untraced: %s", exc)
 
 
 def main():
