@@ -67,62 +67,70 @@ def _get_configs_list(config_dir):
         return []
 
 
-def span(wrapped=None, span_name_prefix=""):
-    """Noop decorator."""
+def read_config(config_path, header):
+    """Read a config file and return a dictionary of key-value pairs."""
+
+    parser = configparser.ConfigParser()
+    with open(config_path, encoding="utf-8") as config_file:
+        try:
+            parser.read_string(f"[{header}]\n{config_file.read()}")
+        except configparser.ParsingError as e:
+            debug("read_config(): invalid config file %s: %s", config_path, e)
+            return {}
+
+    config = {k: v.strip("'") for k, v in dict(parser[header]).items()}
+    debug("%s: %s", config_path, config)
+    return config
+
+
+def span_noop(wrapped=None, span_name_prefix=""):
+    """Noop decorator, is overridden by _init_tracing() if there are configs."""
+
     if wrapped is None:
-        return functools.partial(span, span_name_prefix=span_name_prefix)
+        return functools.partial(span_noop, span_name_prefix=span_name_prefix)
 
     return wrapped
 
 
-def patch_module(_):
-    """Noop patch_module."""
+def patch_module_noop(_):
+    """Noop patch_module, is overridden by _init_tracing() if there are configs"""
 
 
-# The opentelemetry library may generate exceptions we aren't expecting, this code
-# must not fail or it will cause the pass-through script to fail when at worst
-# this script should be a noop. As such, we sometimes need to catch broad exceptions
-# pylint: disable=too-many-locals,too-many-statements,broad-exception-caught
-def _init_tracing(configs, config_dir):
+def _init_tracing(configs: List[str], config_dir: str):  # NOSONAR(complexity=68)
+    """Initialize tracing with the given configuration files.
+
+    If configs is empty return the noop span and patch_module functions.
+    If configs are passed:
+    - import the opentelemetry packages
+    - read the configuration file
+    - create a tracer
+    - trace the script
+    - return the span and patch_module functions for tracing the program.
+    """
+
     # Do not do anything unless configuration files have been found
     if not configs:
-        return span, patch_module
+        return span_noop, patch_module_noop
 
-    # pylint: disable=import-outside-toplevel
     try:
-        import wrapt
-        from opentelemetry import trace
+        from warnings import simplefilter
+
+        # On 3.10-3.12, the import of wrapt might trigger warnings, filter them:
+        simplefilter(action="ignore", category=DeprecationWarning)
+        import wrapt  # type: ignore[import-untyped]
+        from opentelemetry import context, sdk, trace
         from opentelemetry.baggage.propagation import W3CBaggagePropagator
-        from opentelemetry.context import attach
         from opentelemetry.exporter.zipkin.json import ZipkinExporter
-        from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExportResult
-        from opentelemetry.trace import Span
         from opentelemetry.trace.propagation.tracecontext import (
             TraceContextTextMapPropagator,
         )
     except ImportError as err:
         syslog.error("missing opentelemetry dependencies: %s", err)
-        return span, patch_module
-
-    tracers = []
-
-    def kvs_of_config(path, header="default"):
-        cfg = configparser.ConfigParser()
-        with open(path, encoding="utf-8") as config_file:
-            try:
-                cfg.read_string(f"[{header}]\n{config_file.read()}")
-            except configparser.ParsingError as e:
-                debug("badly formatted conf, returning empty. %s", e)
-                return {}
-        kvs = dict(cfg[header])
-        kvs = {k: v.strip("'") for k, v in kvs.items()}
-        debug("%s:kvs=%s", path, kvs)
-        return kvs
+        return span_noop, patch_module_noop
 
     try:
-        kvs_all_conf = kvs_of_config(f"{config_dir}/all.conf")
+        config_dict = read_config(f"{config_dir}/all.conf", header="default")
     except FileNotFoundError:
         kvs_all_conf = {}
     module_names = kvs_all_conf.get(
@@ -192,7 +200,10 @@ def _init_tracing(configs, config_dir):
         propagator = TraceContextTextMapPropagator()
         context_with_traceparent = propagator.extract({"traceparent": traceparent})
 
-        attach(context_with_traceparent)
+        context.attach(context_with_traceparent)
+
+        # Create a tracer provider with the given resource attributes
+        # and add a span processor for each zipkin endpoint
 
         provider = TracerProvider(
             resource=Resource.create(

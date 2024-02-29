@@ -58,7 +58,7 @@ class TestObserver(unittest.TestCase):
 
     # Use the span method defined on import with no configs
     def test_span_after_import(self):
-        simple_method = observer.span(self.simple_method)
+        simple_method = observer.span_noop(self.simple_method)
 
         self.assertEqual(simple_method(), 5)
 
