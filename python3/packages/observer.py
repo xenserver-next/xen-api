@@ -253,25 +253,56 @@ def _init_tracing(configs: List[str], config_dir: str):  # NOSONAR(complexity=68
             provider.add_span_processor(processor_zipkin)
 
         trace.set_tracer_provider(provider)
-        tracer = trace.get_tracer(__name__)
-        return tracer
+        return trace.get_tracer(__name__)
 
-    tracers = list(map(tracer_of_config, configs))
+    tracers = list(map(create_tracer_from_config, configs))
     debug("tracers=%s", tracers)
 
-    # Public decorator that creates a trace around a function func
-    # and then clones the returned span for each of the existing traces.
     def span_of_tracers(wrapped=None, span_name_prefix=""):
+        """
+        Public decorator that creates a trace around a function func.
+
+        If there are no tracers, the function is called without any tracing.
+        If there are tracers, the function is called with a trace around it
+
+        It also creates a span with the given span name prefix and then clones
+        the returned span for each of the existing traces to produce a nested
+        trace for each of them.
+
+        Args:
+            wrapped: The function to be traced.
+            span_name_prefix: The prefix to be added to the span name.
+
+        Returns:
+            The decorated function or a partial function if wrapped is None.
+
+        Example:
+
+        @span_of_tracers(span_name_prefix="my_prefix")
+        def my_function():
+            pass
+
+        my_function() will be traced with the span name "my_prefix:my_function"
+        and the span will be cloned for each of the existing traces to produce
+        a nested trace for each of them.
+
+        If wrapped is None, the decorator is being used with parameters and
+        a partial function is returned instead of the decorated function.
+        """
+
         if wrapped is None:  # handle decorators with parameters
             return functools.partial(span_of_tracers, span_name_prefix=span_name_prefix)
 
         @wrapt.decorator
-        def wrapper(wrapped, _, args, kwargs):
+        def instrument_function(wrapped, _, args, kwargs):
+            """Decorator that creates a trace around a function func."""
+
             if not tracers:
                 return wrapped(*args, **kwargs)
 
             module_name = wrapped.__module__ if hasattr(wrapped, "__module__") else ""
             qual_name = wrapped.__qualname__ if hasattr(wrapped, "__qualname__") else ""
+
             if not module_name and not qual_name:
                 span_name = str(wrapped)
             else:
