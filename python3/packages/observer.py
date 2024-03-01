@@ -423,10 +423,24 @@ def main():
 
     @span(span_name_prefix=argv0)
     def run(file):
-        runpy.run_path(file, run_name="__main__")
+        """Run the given python file calling its __main__ function."""
 
-    run(argv0)
+        # Defensive error handling should hopefully only be needed in exceptional cases.
+        # But in case things go wrong, this may be a starting point for logging it:
+        try:
+            runpy.run_path(file, run_name="__main__")
+        except FileNotFoundError as e:
+            print(
+                f"{__file__}: {shlex.join(sys.argv)}\n{e.filename}: No such file",
+                file=sys.stderr,
+            )
+            return 2
+        except Exception:
+            print(f"{__file__}: {shlex.join(sys.argv)}\n{exception()}", file=sys.stderr)
+            return 139  # This is what the default SIGSEGV handler on Linux returns
+
+    return run(argv0)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
