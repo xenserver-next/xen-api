@@ -170,46 +170,16 @@ discard_messages_matching = [
     "No attribute 'group' on None",
     "No Node.TEXT_NODE in module xml.dom.minidom, referenced from 'xml.dom.expatbuilder'"
 ]
-expected_to_fail = [
-    # Need 2to3 -w <file> and maybe a few other minor updates:
-    "scripts/hatests",
-    "scripts/backup-sr-metadata.py",
-    "scripts/restore-sr-metadata.py",
-    # SSLSocket.send() only accepts bytes, not unicode string as argument:
-    "scripts/examples/python/exportimport.py",
-    # Other fixes needed:
-    "scripts/examples/python/mini-xenrt.py",
-    "scripts/examples/python/XenAPI/XenAPI.py",
-    "scripts/examples/python/monitor-unwanted-domains.py",
-    "scripts/examples/python/shell.py",
-    "scripts/examples/smapiv2.py",
-    "scripts/static-vdis",
-    "scripts/plugins/extauth-hook-AD.py",
-]
+expected_to_fail = []
 
 
 [tool.pytype]
 inputs = [
-    "scripts/static-vdis",
-    "scripts/Makefile",
-    "scripts/generate-iscsi-iqn",
-    "scripts/hatests",
-    "scripts/host-display",
-    "scripts/mail-alarm",
-    "scripts/print-custom-templates",
-    "scripts/probe-device-for-file",
-    "scripts/xe-reset-networking",
-    "scripts/xe-scsi-dev-map",
-    "scripts/examples/python",
-    "scripts/yum-plugins",
-    "scripts/*.py",
-    "python3/packages/*.py",
-
-    # Python 3
     "python3/bin/hfx_filename",
     "python3/bin/perfmon",
     "python3/bin/*.py",
     "python3/libexec/*.py",
+    "python3/packages/*.py",
 
     # To be added later,
     # when converted to Python3-compatible syntax:
@@ -218,12 +188,7 @@ inputs = [
     # "ocaml/xapi-storage/python",
 ]
 disable = [
-    "import-error",  # xenfsimage, xcp.bootloader. xcp.cmd
-    "ignored-abstractmethod",
     "ignored-metaclass",
-    # https://github.com/google/pytype/issues/1130,
-    # https://github.com/google/pytype/issues/1485:
-    "pyi-error",
 ]
 platform = "linux"
-pythonpath = "scripts/examples/python:.:scripts:scripts/plugins:scripts/examples"
+pythonpath = ""
