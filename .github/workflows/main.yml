@@ -37,6 +37,12 @@ jobs:
       - run: echo "::add-matcher::.github/workflows/python-warning-matcher.json"
         name: "Setup GitHub for reporting Python warnings as annotations in pull request code review"
 
+      - uses: jordemort/action-pyright@v1
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          reporter: github-pr-review
+          lib: true
+
       - uses: pre-commit/action@v3.0.0
         name: Run pre-commit hooks with darker, pytest, pylint, and pytype
         if: ${{ matrix.python-version != '2.7' }}
