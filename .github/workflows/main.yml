@@ -37,86 +37,81 @@ jobs:
       - run: echo "::add-matcher::.github/workflows/python-warning-matcher.json"
         name: "Setup GitHub for reporting Python warnings as annotations in pull request code review"
 
-      - uses: pre-commit/action@v3.0.0
-        name: Run pre-commit checks (no spaces at end of lines, etc)
+      - name: Install dependencies for the static analysis
+        if: ${{ matrix.python-version != '2.7' }}
+        run: >
+          pip install opentelemetry-api opentelemetry-exporter-zipkin-json
+          opentelemetry-sdk pytest types-mock mock wrapt pandas
+
+      # pyright is also added as a pre-commit hook in .pre-commit-config.yaml
+      # but we also run it here to get annotations in the pull request code review
+      # in case the pre-commit hook is not run by the developer:
+      # https://github.com/marketplace/actions/run-pyright-with-reviewdog (annotations only)
+      - uses: jordemort/action-pyright@v1
         if: ${{ matrix.python-version != '2.7' }}
         with:
-          extra_args: --all-files --verbose --hook-stage commit
-        env:
-          SKIP: no-commit-to-branch
+          level: notice  # Only at notice level (lower priority than warning)
+          filter_mode: file  # Only report notices when the file is changed
+          fail_on_error: false  # Do not fail CI if there are errors
+          reporter: github-pr-review  # PR review action that adds code review annotations
+          github_token: ${{ secrets.github_token }}  # Invalid after the test is finished
 
-      - name: Install dependencies only needed for python 2
-        if: ${{ matrix.python-version == '2.7' }}
-        run: pip install enum
 
-      - name: Install dependencies only needed for python 3
+      - uses: pre-commit/action@v3.0.0
+        name: Run pre-commit hooks with basic trailing-whitespace checks and pytest
         if: ${{ matrix.python-version != '2.7' }}
-        run: pip install pandas pytype toml wrapt
-
-      - name: Install common dependencies for Python ${{matrix.python-version}}
-        run: pip install future mock pytest-coverage pytest-mock
+        with:
+          # The --hook-stage manual only runs the stages that add the manual keyword in
+          # .pre-commit-config.yaml. Currently that's simple white space checks and pytest:
+          extra_args: --all-files --verbose --hook-stage manual
 
       - name: Run Pytest for python 2 and get code coverage for Codecov
         if: ${{ matrix.python-version == '2.7' }}
         run: >
-          pytest
+          pip install enum future mock pytest-coverage pytest-mock &&
+          pytest --cov-fail-under=10
           --cov=scripts --cov=ocaml/xcp-rrdd
-          scripts/ ocaml/xcp-rrdd -vv -rA
-          --junitxml=.git/pytest${{matrix.python-version}}.xml
-          --cov-report term-missing
-          --cov-report xml:.git/coverage${{matrix.python-version}}.xml
-        env:
-          PYTHONDEVMODE: yes
-
-      - name: Run Pytest for python 3 and get code coverage for Codecov
-        if: ${{ matrix.python-version != '2.7' }}
-        run: >
-          pytest
-          --cov=scripts --cov=ocaml/xcp-rrdd --cov=python3/
-          scripts/ ocaml/xcp-rrdd python3/ -vv -rA
-          --junitxml=.git/pytest${{matrix.python-version}}.xml
-          --cov-report term-missing
-          --cov-report xml:.git/coverage${{matrix.python-version}}.xml
+          scripts/ ocaml/xcp-rrdd -vv -ra
+          --cov-report xml:.git/coverage.xml
         env:
           PYTHONDEVMODE: yes
 
       - name: Upload Python ${{matrix.python-version}} coverage report to Codecov
         uses: codecov/codecov-action@v3
+        # Upload the .git/coverage.xml file created by --cov-report xml:.git/coverage.xml
+        # created by pytest --cov-report xml:.git/coverage.xml above and the pytest config
+        # in xen-api.git/pyproject.toml and .pre-commit-config.yaml in the pre-commit hook.
         with:
           directory: .git
-          files: coverage${{matrix.python-version}}.xml
+          files: coverage.xml
           env_vars: OS,PYTHON
           fail_ci_if_error: false
           flags: python${{matrix.python-version}}
           name: coverage${{matrix.python-version}}
           verbose: true
 
-      - uses: dciborow/action-pylint@0.1.0
+      # pylint is also added as a pre-commit hook in .pre-commit-config.yaml
+      # but we also run it here to get annotations in the pull request code review
+      # in case the pre-commit hook is not run by the developer:
+      - uses: dciborow/action-pylint@0.1.1
         if: ${{ matrix.python-version != '2.7' }}
         with:
           reporter: github-pr-review
+          # Disable import errors and comments that are for later clean-up stages, but
+          # not for the 1st stage of porting the code to Python 3.6 and reviewing the
+          # changes closely in the pull request code review:
+          pylint_args: --disable=import-error --disable=C
+          # Do not fail CI if there are errors, because most warnings are not errors
+          # but we want to see them in the pull request code review in case a potentially
+          # a warning that could be serious is missed by the developer, like if open()
+          # without encoding is used in Python 3.6 in a XAPI plugin where the locale
+          # us not set to an UTF-8 locale. If in such situation the opened file deals
+          # with UTF-8 characters, the code will fail in Python 3.6 but not in Python 2.7.
+          # and also not in 3.7 and later (as these have an UTF-8 mode that gets enabled).
+          fail_on_error: false
           level: warning
           # To be customized to cover remaining Python scripts:
           glob_pattern: "**/*.py"
-
-      - name: Run pytype checks
-        if: ${{ matrix.python-version != '2.7' }}
-        run: ./pytype_reporter.py
-        env:
-          PR_NUMBER: ${{ github.event.number }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PYTYPE_REPORTER_DEBUG: True
-
-      # Try to add pytype_report.py's summary file as a comment to the PR:
-      # Documentation: https://github.com/marketplace/actions/add-pr-comment
-      - name: Add the pytype summary as a comment to the PR (if permitted)
-        uses: mshick/add-pr-comment@v2
-        # Depends on pytype checks, which are not run for python 2.7:
-        if: ${{ matrix.python-version != '2.7' }}
-        # Fails for user workflows without permissions(fork-based pull requests):
-        continue-on-error: true
-        with:
-          message-path: .git/pytype-summary.md # Add the content of it as comment
 
   ocaml-tests:
     name: Run OCaml tests

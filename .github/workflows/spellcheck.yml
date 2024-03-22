@@ -1,0 +1,14 @@
+name: reviewdog
+on: [pull_request]
+jobs:
+  reviewdog:
+    name: Code spell checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Let languagetool review the PR
+        uses: reviewdog/action-languagetool@v1
+        # https://github.com/marketplace/actions/run-languagetool-with-reviewdog
+        with:
+          reporter: github-pr-review
+          level: info

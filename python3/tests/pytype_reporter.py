@@ -9,16 +9,13 @@ from os import environ as env, getcwd
 from os.path import basename
 from subprocess import check_output, PIPE, Popen  # nosec:B404
 from sys import argv, exit as sys_exit, stderr, stdout
-from typing import Dict, List, TextIO, Tuple, TYPE_CHECKING
+from typing import Any, Dict, List, TextIO, Tuple
 from urllib import request
 from warnings import catch_warnings, simplefilter
 
 import toml
 
-if TYPE_CHECKING:
-    from typing import FileDescriptorLike
-
-Config = dict[str, str]
+Config = Dict[str, str]
 Info = List[dict]
 Ret = Tuple[int, Info]
 
@@ -207,11 +204,11 @@ def report_on(config: Config, log: TextIO, command: List[str], results: Info) ->
         return (popen.returncode or 0), output
 
 
-def readline(fileobj):
-    # type: (FileDescriptorLike) -> str
+def readline(fileobj: Any) -> str:
     """Convince pytype that fileobj is of type FileDescriptorLike"""
 
-    return fileobj.readline()
+    ret: str = fileobj.readline()
+    return ret
 
 
 def handle_grouping(filename: str, last_filename: str, log: TextIO):
@@ -280,9 +277,20 @@ def parse_annotations(c: Config, popen: Popen[str], log: TextIO, results: Info) 
                 if line == "":
                     continue
                 if line[0] == " " or line.startswith(MORE) or line.startswith(TRACE):
-                    log_message += extend_error_description(line, error_dict)
+                    # __dunder__ variables and strings are quoted as code:
+                    error_line = re.sub(r"(__\w+__)", r"`\1`", line)
+                    error_line = re.sub(r"'(\w+)'", r"(`\1`)", line)
+                    # Expected: (self, __data: Buffer, ...)
+                    # Actually passed: (self, __data: str)
+                    error_line = re.sub(r"\((.*?)\)", r"(`\1`)", error_line)
+                    # In Union[None, str]
+                    error_line = re.sub(r"([Ii]n )(.*)", r"\1`\2`", error_line)
+                    log_message += extend_error_description(error_line, error_dict)
                     continue
-                print(log_message, file=log)
+
+                # Only generate GitHub annotations for changed files:
+                if last_filename in c.get("changed_files", []):
+                    print(log_message, file=log)
                 results.append(error_dict)
             log_message, error_dict, filename = github_error(config=c, line=line)
             # Grouping of log lines:
@@ -561,8 +569,8 @@ def check_only_reverts_from_branch_point(config: Config, changed_files: List[str
     pr_number = env.get("PR_NUMBER", "")
     msgs = github_get_pr_commit_messages(repo, pr_number)
     if not msgs:
-        old_cmd = ["git", "log", "--pretty=%s", find_branch_point(config) + "..HEAD"]
-        msgs = check_output(old_cmd, universal_newlines=True).split("\n")  # nosec:B607 B603
+        cmd = ["git", "log", "--pretty=%s", find_branch_point(config) + "..HEAD"]
+        msgs = check_output(cmd, universal_newlines=True).split("\n")  # nosec:B607 B603
 
     for commit_message in msgs:  # Check if each commit is a revert
         print("#> " + commit_message)
@@ -572,8 +580,8 @@ def check_only_reverts_from_branch_point(config: Config, changed_files: List[str
     # diff the xfail files in the PR with their state 4 weeks ago and show the check
     # on stdout and the GitHub PR comment added by saving a file in this script:
     pr_url = f"{config['repo_url']}/pull/{pr_number or '<PR-number>'}"
-    old_cmd = ["git", "rev-list", "-n1", "--before=4 weeks ago", "HEAD" ]
-    old_ref = check_output(old_cmd, universal_newlines=True).strip()
+    cmd = ["git", "rev-list", "-n1", "--before=4 weeks ago", "HEAD"]
+    old_ref = check_output(cmd, universal_newlines=True).strip()
     config["msg"] = f'\n## {config["script_name"]}: Only "Revert" commits on this PR.\n'
     config["msg"] += "Checking the revert diff:\n```sh\ngh pr checkout " + pr_url + "\n"
     config["msg"] += "REF=$(git rev-list -n 1 --before='4 weeks ago' HEAD)\n"
@@ -599,13 +607,15 @@ def main():
     config_file = "pyproject.toml"
     config = load_config(config_file, basename(__file__))
     config.setdefault("expected_to_fail", [])
-    debug("Expected to fail: %s", ", ".join(config["expected_to_fail"]))
+    changed_but_in_expected_to_fail = []
+    if config["expected_to_fail"]:
+        debug("Expected to fail: %s", ", ".join(config["expected_to_fail"]))
 
-    changed_but_in_expected_to_fail = git_diff(
-        "--name-only",
-        find_branch_point(config),
-        *config["expected_to_fail"],
-    ).splitlines()
+        changed_but_in_expected_to_fail = git_diff(
+            "--name-only",
+            find_branch_point(config),
+            *config["expected_to_fail"],
+        ).splitlines()
 
     if check_only_reverts_from_branch_point(config, changed_but_in_expected_to_fail):
         return run_pytype_and_generate_summary(config)
