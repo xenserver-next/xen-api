@@ -27,6 +27,28 @@ repository = "https://github.com/xapi-project/xen-api"
 [tool.black]
 line-length = 88
 
+
+# -----------------------------------------------------------------------------
+# Coverage.py - https://coverage.readthedocs.io/en/coverage-5.5/config.html
+# -----------------------------------------------------------------------------
+
+[tool.coverage.report]
+# Here, developers can configure which lines do not need to be covered by tests:
+exclude_lines = [
+    "pragma: no cover",  # standard pragma for not covering a line or block
+    "if TYPE_CHECKING:", # imports for type checking only
+    "pass",
+    # Other specific lines that do not need to be covered, comment in which file:
+    "raise NbdDeviceNotFound",  # python3/libexec/usb_scan.py
+]
+# Here, developers can configure the minimum coverage required for the checks to pass:
+fail_under = 60
+# precision digits to use when reporting coverage (sub-percent-digits are not reported):
+precision = 0
+# skip_covered: Skip reporting files with 100% coverage:
+skip_covered = true
+
+
 [tool.isort]
 line_length = 88
 py_version = 36
@@ -40,6 +62,8 @@ disable = [
     "missing-module-docstring",
     "missing-class-docstring",
     "consider-using-f-string",
+    "too-few-public-methods",
+    "too-many-public-methods",
     "too-many-branches",
     "too-many-arguments",
     "broad-exception-caught",
@@ -88,6 +112,8 @@ disallow_subclassing_any = true
 # Specifies the paths of directories or files that should be included in the
 # analysis. If no paths are specified, all files in the workspace are included:
 include = ["python3", "ocaml/xcp-rrdd"]
+
+reportMissingImports = false
 
 # Conditionalize the stube files for type definitions based on the platform:
 pythonPlatform = "Linux"

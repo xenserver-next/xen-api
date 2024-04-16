@@ -21,6 +21,8 @@
 # 2. check if device can be passed through based on policy file
 # 3. return the device info to XAPI in json format
 
+# pylint: disable=redefined-outer-name
+# pyright: reportPossiblyUnboundVariable=false, reportAttributeAccessIssue=false
 
 import abc
 import argparse
@@ -59,7 +61,7 @@ def hex_equal(h1, h2):
 class UsbObject(dict):
     """Base class of USB classes, save USB properties in dict
 
-    node(str): the key, device node
+    node(str): the key, device nodepr
     """
 
     __metaclass__ = abc.ABCMeta
@@ -71,7 +73,7 @@ class UsbObject(dict):
     def get_node(self):
         return self.node
 
-    def __hash__(self):
+    def __hash__(self):  # pyright:ignore[reportIncompatibleVariableOverride]
         return hash(self.node)
 
     def __eq__(self, other):
@@ -109,14 +111,14 @@ class UsbObject(dict):
         return cls is not None and hex_equal(__VALUE_CLASS_HUB, cls)
 
     @abc.abstractmethod
-    def is_class_hub(self):
+    def is_class_hub(self) -> bool:
         """check if this belongs to a hub
 
         :return: bool, if this belongs to a hub
         """
 
     @abc.abstractmethod
-    def is_child_of(self, parent):
+    def is_child_of(self, parent) -> bool:
         """check if this is a child of parent
 
         :param parent:(UsbObject) the parent to check against
@@ -282,6 +284,7 @@ class UsbInterface(UsbObject):
             if props.get(p) is not None:
                 self[p] = props.get(p).decode()
 
+    # pylint: disable-next=useless-parent-delegation # This parent call is superfluous
     def debug_str(self, level=0):
         return super().debug_str(level)
 
@@ -289,10 +292,6 @@ class UsbInterface(UsbObject):
         return self._is_class_hub(self._CLASS)
 
     def is_initialized(self):
-        # usb_intf_attr(bInterfaceNumber, "%02x\n");
-        # usb_intf_attr(bInterfaceClass, "%02x\n");
-        # usb_intf_attr(bInterfaceSubClass, "%02x\n");
-        # usb_intf_attr(bInterfaceProtocol, "%02x\n");
         for p in self._PROPS:
             if p not in self or not self.validate_int(self[p], 16):
                 return False

@@ -1,6 +1,6 @@
-#!/usr/bin/env python
-#
-# unittest for usb_scan.py
+"""
+This module provides the unittest for perfmon
+"""
 
 import os
 import shutil
@@ -11,6 +11,8 @@ from collections.abc import Mapping
 from typing import cast
 
 import mock
+
+from import_file import get_module
 
 from python3.tests.import_helper import import_file_as_module
 # mock modules to avoid dependencies
@@ -25,8 +27,7 @@ class MocDeviceAttrs(Mapping):
         self.d = device.get_attr()
 
     def __iter__(self):  # pragma: no cover
-        for name in self.d:
-            yield name
+        yield from self.d
 
     def __len__(self):  # pragma: no cover
         return len(self.d)
@@ -54,8 +55,7 @@ class MocDevice(Mapping):
         return MocDeviceAttrs(self)
 
     def __iter__(self):  # pragma: no cover
-        for name in self.get_prop():
-            yield name
+        yield from self.get_prop()
 
     def __len__(self):  # pragma: no cover
         return len(self.get_prop())
@@ -64,7 +64,7 @@ class MocDevice(Mapping):
         return self.get_prop().get(name)
 
 
-class MocEnumerator(object):
+class MocEnumerator():
     def __init__(self, ds):
         self.ds = ds
 
@@ -73,7 +73,7 @@ class MocEnumerator(object):
             yield MocDevice(d)
 
 
-class MocContext(object):
+class MocContext():
     def __init__(self, devices, interfaces):
         self.devices = devices
         self.interfaces = interfaces
@@ -85,6 +85,7 @@ class MocContext(object):
             return MocEnumerator(self.devices)
         elif dev_type == "usb_interface":
             return MocEnumerator(self.interfaces)
+        raise AssertionError(f"unexpected {dev_type}")  # pragma: no cover
 
 
 def mock_setup(mod, devices, interfaces, path):
@@ -96,6 +97,7 @@ def mock_setup(mod, devices, interfaces, path):
 
 
 def verify_log(_):
+    """Mock function for mock_setup()"""
     pass
 
 
@@ -225,7 +227,7 @@ class TestUsbScan(unittest.TestCase):
         ]
         self.verify_usb_common(devices, interfaces, results)
 
-    def test_usb_dongle_unbinded(self):
+    def test_usb_unbound_dongle(self):
         devices = [
             {
                 "name": "1-2",
