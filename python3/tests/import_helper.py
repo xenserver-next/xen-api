@@ -4,8 +4,8 @@ import sys
 from contextlib import contextmanager
 from types import ModuleType
 
-from mock import Mock
 from typing import Generator
+from mock import Mock
 
 
 @contextmanager
