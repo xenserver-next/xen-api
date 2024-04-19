@@ -10,7 +10,7 @@ import unittest
 from collections.abc import Mapping
 
 import mock
-from import_file import get_module
+from import_helper import import_file_as_module
 
 sys.modules["xcp"] = mock.Mock()
 sys.modules["xcp.logger"] = mock.Mock()
@@ -109,7 +109,7 @@ class TestUsbScan(unittest.TestCase):
         moc_results,
         path="./scripts/usb-policy.conf"
     ):
-        usb_scan = get_module("usb_scan", "../libexec/usb_scan.py")
+        usb_scan = import_file_as_module("python3/libexec/usb_scan.py")
 
         mock_setup(usb_scan, moc_devices, moc_interfaces, path)
 
