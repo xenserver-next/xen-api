@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-This module provides unittest for perfmon
+This module provides the unittest for perfmon
 """
+
+# pyright: reportAttributeAccessIssue=false
 
 import sys
 import math
