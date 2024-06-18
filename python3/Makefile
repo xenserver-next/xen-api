@@ -14,10 +14,11 @@ install:
 	
 	$(IDATA) packages/observer.py $(DESTDIR)$(SITE3_DIR)/
 
+	$(IPROG) libexec/link-vms-by-sr.py $(DESTDIR)$(LIBEXECDIR)
 	$(IPROG) libexec/usb_reset.py $(DESTDIR)$(LIBEXECDIR)
 	$(IPROG) libexec/usb_scan.py $(DESTDIR)$(LIBEXECDIR)
 	$(IPROG) libexec/nbd_client_manager.py $(DESTDIR)$(LIBEXECDIR)
-	
+
 	$(IPROG) bin/hfx_filename $(DESTDIR)$(OPTDIR)/bin
 	$(IPROG) bin/perfmon $(DESTDIR)$(OPTDIR)/bin
 	$(IPROG) bin/xe-scsi-dev-map $(DESTDIR)$(OPTDIR)/bin
