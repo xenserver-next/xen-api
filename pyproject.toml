@@ -194,6 +194,7 @@ disable = [
 # typeCheckingMode: set the standard type checking mode
 include              = ["python3", "ocaml/xcp-rrdd"]
 strict               = ["python3/tests/observer"]
+stubPath             = "python3/stubs"
 pythonPlatform       = "Linux"
 typeCheckingMode     = "standard"
 reportMissingImports = false
