@@ -105,17 +105,17 @@ def list_vdis():
     return list(map(load, all))
 
 def fresh_name():
-    all = []
+    """Return a unique name for a new static VDI configuration directory"""
     try:
         all = os.listdir(main_dir)
         for i in range(0, len(all) + 1): # guarantees to find a unique number
             i = str(i)
-            if not(i in all):
+            if i not in all:
                 return i
-    except:
+    except OSError:  # All possible errors are subclasses of OSError
         # Directory doesn't exist
         os.mkdir(main_dir)
-        return "0"
+    return "0"  # Always return a string, fixes pyright error by not returning None
         
 
 def to_string_list(d):
