@@ -54,6 +54,12 @@ jobs:
           --cov-report term-missing
           --cov-report xml:.git/coverage${{matrix.python-version}}.xml
 
+      - name: Upload coverage report to Coveralls
+        uses: coverallsapp/github-action@v1
+        with:
+          file: .git/coverage${{matrix.python-version}}.xml
+          flag_name: python${{matrix.python-version}}
+
       - name: Upload Python ${{matrix.python-version}} coverage report to Codecov
         if: ${{ matrix.python-version != '2.7' }}
         uses: codecov/codecov-action@v3
