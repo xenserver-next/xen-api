@@ -3,11 +3,21 @@ name: Generate and upload Hugo docs
 on:
   push:
     branches: master
+  pull_request:
+    # Only run the workflow on changes to the following paths
+    paths:
+      - 'doc/**'
+      - '.github/workflows/hugo.yml'
 
 jobs:
-  ocaml:
+  hugo:
     name: Docs
     runs-on: ubuntu-22.04
+    environment:
+      # To be able read var.PREVIEW_HUGO_DOCS, if set in the github-pages environment:
+      name: github-pages
+    outputs:
+      preview: ${{ steps.preview.outputs.done }}  # Set to true if the preview job runs
 
     steps:
       - name: Checkout code
@@ -25,6 +35,9 @@ jobs:
 
       - name: Deploy
         uses: peaceiris/actions-gh-pages@v4
+        # The deploy key used for deployment to https://xenapi-project.github.io
+        # It is stored in the repository's secrets and is used to push the built
+        # documentation. This step skips deployment if it is not set on a clone.
         with:
           deploy_key: ${{ secrets.ACTIONS_DOCS_DEPLOY_KEY }}
           publish_dir: ./doc/public
@@ -35,3 +48,52 @@ jobs:
           destination_dir: new-docs # temporary staging branch
           allow_empty_commit: false
           enable_jekyll: true # do not create .nojekyll file
+
+      # Deploy to the github-pages environment for doc reviews in other repositories
+      # if vars.PREVIEW_HUGO_DOCS set by the admin in the repository's environment
+      # This is done without commiting to the repository's gh-pages branch, only
+      # an artifact is deployed to the clone's github-pages environment instead:
+
+      - name: If vars.PREVIEW_HUGO_DOCS is true, enable github pages for the preview
+        if: ${{ vars.PREVIEW_HUGO_DOCS == 'true' }}  # Only runs if set by the admin
+        id: configure-pages
+        with:
+          enablement: true  # Enables GitHub Pages for the clone repository
+        uses: actions/configure-pages@v5  # output: the base_url for the preview site
+
+      - name: If vars.PREVIEW_HUGO_DOCS is true, build the hugo preview
+        if: ${{ vars.PREVIEW_HUGO_DOCS == 'true' }}
+        id: preview
+        env:
+          # Override the Hugo baseUrl in doc/hugo.toml with the repo name for doc reviews:
+          HUGO_BASEURL: ${{ steps.configure-pages.outputs.base_url }}
+        run: cd doc && hugo --minify && echo done=true >$GITHUB_OUTPUT
+
+      - name: If vars.PREVIEW_HUGO_DOCS is true, upload the Hugo site as an artifact
+        if: ${{ vars.PREVIEW_HUGO_DOCS == 'true' }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./doc/public
+
+
+  # When pushed to other repositories, deploy to the repository's GitHub Pages
+  preview-docs:
+    # Add a dependency to the hugo job, skip if the hugo job did not complete
+    needs: hugo
+
+    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+    permissions:
+      id-token: write  # Required for the deployment job to access the uploaded artifact
+      pages: write     # Required for the deployment job to deploy to GitHub Pages
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    # Specify runner + deployment step
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Deploy uploaded artifact to GitHub Pages for documentation update reviews
+        if: ${{ needs.hugo.outputs.preview == 'true' }}
+        id: deployment
+        uses: actions/deploy-pages@v4
